@@ -1,67 +1,71 @@
+# tether_main/views.py
 from django.contrib.auth.models import User
-from django.shortcuts import render
-from django.http import HttpResponse
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth import login
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
-from django.contrib.auth import login, authenticate
+from rest_framework import status, viewsets, permissions
+
+from allauth.account.models import EmailAddress
+from allauth.account.forms import SignupForm
 from allauth.account.views import LoginView, LogoutView
-from .models import Relationship  # Assuming you'll create a Relationship model later
-from .serializers import UserSerializer  # If you need custom user serialization
 
+from .models import Relationship
+from .serializers import UserSerializer, RelationshipSerializer
 
-# Register User View (using Django Allauth)
 class RegisterUser(APIView):
     def post(self, request):
-        # Data should be in the correct format to register a new user using Allauth
         data = {
             "username": request.data.get("username"),
             "email": request.data.get("email"),
             "password1": request.data.get("password1"),
             "password2": request.data.get("password2")
         }
-        
-        # Send data to Allauth registration logic (this can be handled by forms or serializers)
-        response = self.register_user_with_allauth(data)
-        if response.status_code == 201:  # Successful creation
-            return Response(response.data, status=status.HTTP_201_CREATED)
-        return Response(response.data, status=status.HTTP_400_BAD_REQUEST)
+        allauth_response = self.register_user_with_allauth(data)
+
+        if allauth_response.status_code in [200, 201, 302]:
+            new_user = User.objects.filter(username=data["username"]).first()
+            if new_user:
+                login(request, new_user, backend='allauth.account.auth_backends.AuthenticationBackend')
+            return Response({"detail": "User created and auto-logged in!"},
+                            status=status.HTTP_201_CREATED)
+        else:
+            return Response(allauth_response.data, status=status.HTTP_400_BAD_REQUEST)
 
     def register_user_with_allauth(self, data):
-        """Use Allauth to register a user"""
-        from allauth.account.models import EmailAddress
-        from django.contrib.auth import get_user_model
-        from allauth.account.forms import SignupForm
-        
-        user_model = get_user_model()
+        # Now it's a method of RegisterUser
         signup_form = SignupForm(data=data)
         if signup_form.is_valid():
-            user = signup_form.save()
+            user = signup_form.save(self.request)
             email = data["email"]
             EmailAddress.objects.create(user=user, email=email, primary=True, verified=True)
-            return Response({"detail": "User created successfully!"}, status=status.HTTP_201_CREATED)
+            return Response({"detail": "User created successfully!"},
+                            status=status.HTTP_201_CREATED)
         else:
-            return Response({"detail": "Error creating user."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Form errors", "errors": signup_form.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-# List All Users View (if you need to list users)
+
 class UserListView(APIView):
     def get(self, request):
-        users = User.objects.all()  # Or any custom filtering as needed
-        serializer = UserSerializer(users, many=True)  # You may have a custom serializer for User
+        users = User.objects.all()
+        serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
-# User Dashboard View
-@login_required
-def dashboard(request):
-    """Display user-related info, such as relationships"""
-    relationships = Relationship.objects.filter(user=request.user)  # Assuming Relationship model
-    return render(request, 'dashboard.html', {'relationships': relationships})
-
-# Login View (Handled by Allauth, but can be overridden if customizations are needed)
 class CustomLoginView(LoginView):
-    template_name = 'account/login.html'  # Customize your template here
+    template_name = 'account/login.html'
 
-# Logout View (Handled by Allauth)
 class CustomLogoutView(LogoutView):
-    next_page = '/'  # Redirect to home page after logout
+    next_page = '/'
+
+class RelationshipViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RelationshipSerializer
+    queryset = Relationship.objects.all()
+
+    def get_queryset(self):
+        return Relationship.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
