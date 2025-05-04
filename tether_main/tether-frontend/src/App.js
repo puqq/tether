@@ -1,31 +1,30 @@
 // src/App.js
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
+import NavBar from './NavBar';
+import PrivateRoute from './PrivateRoute';
 import Register from './Register';
-import RelationshipsPage from './RelationshipsPage';
 import Login from './login';
+import RelationshipsPage from './RelationshipsPage';
 
 function App() {
   return (
-    <Router>
-      <div style={{ padding: '20px' }}>
-        <h1>Welcome to Tether</h1>
-        <nav>
-          <Link to="/">Home</Link> |{' '}
-          <Link to="/login">Login</Link> |{' '}
-          <Link to="/relationships">Manage Relationships</Link>
-        </nav>
-        <hr />
+    <div style={{ padding: 20 }}>
+      <h1>Welcome to Tether</h1>
+      <NavBar />
+      <hr />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<div>Home Page</div>} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/login" element={<Login />} />
 
-        <Routes>
-          <Route path="/" element={<div>Home Page</div>} />
-          {/* No link in nav, but we still have a /register route */}
-          <Route path="/register" element={<Register />} /> 
-          <Route path="/login" element={<Login />} />
+        {/* Protected routes */}
+        <Route element={<PrivateRoute />}>
           <Route path="/relationships" element={<RelationshipsPage />} />
-        </Routes>
-      </div>
-    </Router>
+        </Route>
+      </Routes>
+    </div>
   );
 }
 

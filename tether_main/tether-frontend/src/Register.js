@@ -10,7 +10,7 @@ function Register() {
 
   const handleRegister = (e) => {
     e.preventDefault();
-    axios.post('http://127.0.0.1:8000/api/register/', {
+    axios.post('api/register/', {
       username,
       email,
       password1,
