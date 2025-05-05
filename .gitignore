@@ -8,7 +8,6 @@ venv/
 
 # Node/React
 node_modules/
-build/
 dist/
 
 # OS-specific
